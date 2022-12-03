@@ -1,4 +1,4 @@
-import React, {ChangeEvent, useRef, useState} from 'react';
+import React, {ChangeEvent, useMemo, useRef, useState} from 'react';
 import {read, utils, writeFile} from "xlsx";
 import moment, {Moment} from "moment";
 
@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [data, setData] = useState<Map<string, Moment[]>>(new Map());
   const [persons, setPersons] = useState<Person[]>([]);
   const [fileName, setFileName] = useState("");
+  const [companyName, setCompanyName] = useState("");
 
   const personInputRef = useRef<any>(null);
   const excelInputRef = useRef<any>(null);
@@ -27,12 +28,6 @@ const App: React.FC = () => {
 
 
   const readStringAsYearMonth = (s: string) => moment(s, 'YYYYMM');
-  const yearMonthToDateString = (yearMonth: Moment, isStart: boolean) => {
-    const lastYM = moment().subtract(1, "month");
-    return yearMonth.year() === lastYM.year() && yearMonth.month() === lastYM.month() && !isStart ?
-      "/" :
-      yearMonth.format('YYYY/MM/DD')
-  };
   const yearMonthToString = (yearMonth: Moment) => yearMonth.format('YYYYMM');
 
   const sortYearMonth = (yearMonths: Moment[]) => {
@@ -57,7 +52,7 @@ const App: React.FC = () => {
           const ds = utils.sheet_to_json<Person>(workBook.Sheets[sheetName], {header: ['name', 'id']});
           const month = readStringAsYearMonth(sheetName);
           months.push(month);
-          ds.splice(0, 3);
+          ds.splice(0, 2);
           ds.forEach(row => {
             row.name = row.name.trim();
             row.id = row.id.trim();
@@ -70,7 +65,7 @@ const App: React.FC = () => {
           })
         })
 
-        setMonths(months);
+        setMonths(months.sort((a, b) => a.diff(b)));
         setData(data);
       };
     }
@@ -122,6 +117,53 @@ const App: React.FC = () => {
     writeFile(wb, fileName);
   }
 
+  const changeCompanyName = (event: ChangeEvent<HTMLInputElement>) => {
+    setCompanyName(event.target.value ?? "");
+  }
+
+  const years = () => Array.from(new Set(months.map(m => m.year()))).sort((a, b) => a - b);
+
+  const renderYearColumn = () => {
+    const year = new Map<number, number>();
+    months.forEach(month => {
+      if (year.has(month.year())) {
+        year.set(month.year(), (year.get(month.year()) ?? 0) + 1);
+      } else {
+        year.set(month.year(), 1);
+      }
+    });
+    return Array.from(year.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([year, count], i) =>
+        <th key={`year_col_${i}`} colSpan={count}>{year}</th>
+      );
+  }
+
+  const footer = () => {
+    const personToCount = Array.from(data.entries())
+      .filter(([key]) => persons.length == 0 ? true : persons.some(p => Person.toStr(p) === key))
+      .map(([k, v]) => v)
+      .flat();
+
+    return months.map(m => <td>{personToCount.filter(s => s.diff(m) == 0).length * 650}</td>)
+  }
+
+  const monthCount = ()=>{
+    const personToCount = Array.from(data.entries())
+      .filter(([key]) => persons.length == 0 ? true : persons.some(p => Person.toStr(p) === key))
+      .map(([k, v]) => v)
+      .flat();
+    return personToCount.length;
+  }
+
+  const yearCount = ()=>{
+    const personToCount = Array.from(data.entries())
+      .filter(([key]) => persons.length == 0 ? true : persons.some(p => Person.toStr(p) === key))
+      .map(([k, v]) => v)
+      .flat();
+    return years().map(y=><td>{personToCount.filter(v=>v.year() === y).length*650}</td>);
+  }
+
   return (
     <div style={{display: "flex", padding: 8, paddingTop: 32, flexDirection: "column"}}>
       <span>1. 请上传参保表格:</span>
@@ -137,43 +179,76 @@ const App: React.FC = () => {
         <button onClick={resetPerson}>清空人员名单</button>
       </div>
 
+      <hr/>
+      <span>3. 公司名称:</span>
+      <input type={"text"} value={companyName} onChange={changeCompanyName}/>
 
       <hr/>
-      <button onClick={exportExcel}>3. 导出结果</button>
-      {
-        months.length != 0 &&
-        <table border={1} ref={tableRef}>
-            <thead>
-            <tr>
-                <th style={{width: 200}}>姓名</th>
-                <th>身份证</th>
-                <th>开始参保年月</th>
-                <th>终止参保年月</th>
-              {months.map((m, i) => <th key={`month_${i}`}>{yearMonthToString(m)}</th>)}
-            </tr>
-            </thead>
-            <tbody>
-            {
-              Array.from(data.entries())
-                .filter(([key]) => persons.length == 0 ? true : persons.some(p => Person.toStr(p) === key))
-                .map(([key, value], i) => {
-                  const [start, end] = sortYearMonth(value);
-                  const person = Person.fromString(key);
-                  return <tr key={`row_${i}`}>
-                    <td>{person.name}</td>
-                    <td>{person.id}</td>
-                    <td>{yearMonthToDateString(start, true)}</td>
-                    <td>{yearMonthToDateString(end, false)}</td>
-                    {months.map((month, j) =>
-                      <td key={`money_${i}_${j}`}
-                          style={{textAlign: 'right'}}>{value.some(m => m === month) ? '650' : ''}</td>
-                    )}
-                  </tr>
-                })
-            }
-            </tbody>
-        </table>
-      }
+      <button onClick={exportExcel}>4. 导出结果</button>
+
+      <table border={1} ref={tableRef} style={{display: months.length == 0 ? 'none' : "block"}}>
+        <thead>
+        <tr>
+          {useMemo(() => <th>{companyName}</th>, [companyName])}
+          <th/>
+          <th/>
+          <th/>
+          {useMemo(() => renderYearColumn(), [data, months, persons])}
+          <th colSpan={2 + years().length}>数据统计</th>
+        </tr>
+        {useMemo(() => <>
+          <tr>
+            <th style={{width: 200}}>姓名</th>
+            <th>身份证</th>
+            <th>开始参保年月</th>
+            <th>终止参保年月</th>
+            {months.map((m, i) => <th key={`month_${i}`}>{yearMonthToString(m)}</th>)}
+            <th>购买社保合计月</th>
+            {years().map(y => <th>{y + "年"}</th>)}
+            <th>合计</th>
+          </tr>
+        </>, [data, months, persons])}
+        </thead>
+        {useMemo(() => <>
+          <tbody>
+          {
+            Array.from(data.entries())
+              .filter(([key]) => persons.length == 0 ? true : persons.some(p => Person.toStr(p) === key))
+              .map(([key, value], i) => {
+                const [start, end] = sortYearMonth(value);
+                const person = Person.fromString(key);
+                return <tr key={`row_${i}`}>
+                  <td>{person.name}</td>
+                  <td>{person.id}</td>
+                  <td>{yearMonthToString(start)}</td>
+                  <td>{yearMonthToString(end)}</td>
+                  {months.map((month, j) =>
+                    <td key={`money_${i}_${j}`}
+                        style={{textAlign: 'right'}}>{value.some(m => m === month) ? '650' : ''}</td>
+                  )}
+                  <td>{value.length}</td>
+                  {
+                    years().map(y => <td>{value.filter(v => v.year() == y).length * 650}</td>)
+                  }
+                  <td>{value.length * 650}</td>
+                </tr>
+              })
+          }
+          </tbody>
+          <tfoot>
+          <tr>
+            <td/>
+            <td/>
+            <td/>
+            <td>合计</td>
+            {footer()}
+            <td>{monthCount()}</td>
+            {yearCount()}
+            <td>{monthCount()*650}</td>
+          </tr>
+          </tfoot>
+        </>, [data, months, persons])}
+      </table>
     </div>
   );
 }
