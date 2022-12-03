@@ -11,7 +11,7 @@ class Person {
     return {name, id} as Person;
   }
 
-  static toStr = (p:Person) => `${p.name}_${p.id}`;
+  static toStr = (p: Person) => `${p.name}_${p.id}`;
 }
 
 
@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [fileName, setFileName] = useState("");
 
   const personInputRef = useRef<any>(null);
+  const excelInputRef = useRef<any>(null);
   const tableRef = useRef<any>(null);
 
 
@@ -58,6 +59,8 @@ const App: React.FC = () => {
           months.push(month);
           ds.splice(0, 3);
           ds.forEach(row => {
+            row.name = row.name.trim();
+            row.id = row.id.trim();
             const key = Person.toStr(row);
             if (!data.has(key)) {
               data.set(key, [month]);
@@ -86,6 +89,10 @@ const App: React.FC = () => {
           {header: ['name', 'id']}
         );
         ds.splice(0, 1);
+        ds.forEach(p => {
+          p.name = p.name.trim();
+          p.id = p.id.trim();
+        });
         setPersons(ds);
       };
     }
@@ -95,6 +102,13 @@ const App: React.FC = () => {
     setPersons([]);
     personInputRef.current.value = null;
   };
+
+  const resetExcel = () => {
+    setData(new Map());
+    setMonths([]);
+    setFileName("");
+    excelInputRef.current.value = null;
+  }
 
   const exportExcel = () => {
     if (tableRef.current === null) {
@@ -111,11 +125,19 @@ const App: React.FC = () => {
   return (
     <div style={{display: "flex", padding: 8, paddingTop: 32, flexDirection: "column"}}>
       <span>1. 请上传参保表格:</span>
-      <input type={"file"} onChange={loadExcel}/>
+      <div style={{display: "flex", justifyContent: "space-between"}}>
+        <input ref={excelInputRef} type={"file"} onChange={loadExcel}/>
+        <button onClick={resetExcel}>清空参保表格</button>
+      </div>
+
       <hr/>
       <span>2. 请上传要赛选的人员名单:</span>
-      <input ref={personInputRef} type={"file"} onChange={loadPerson}/>
-      <button onClick={resetPerson}>清空人员名单</button>
+      <div style={{display: "flex", justifyContent: "space-between"}}>
+        <input ref={personInputRef} type={"file"} onChange={loadPerson}/>
+        <button onClick={resetPerson}>清空人员名单</button>
+      </div>
+
+
       <hr/>
       <button onClick={exportExcel}>3. 导出结果</button>
       {
