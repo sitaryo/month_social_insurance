@@ -166,6 +166,7 @@ const App: React.FC = () => {
 
   return (
     <div style={{display: "flex", padding: 8, paddingTop: 32, flexDirection: "column"}}>
+      <h3 style={{textAlign:"center"}}>参保汇总工具 v1.0.1</h3>
       <span>1. 请上传参保表格:</span>
       <div style={{display: "flex", justifyContent: "space-between"}}>
         <input ref={excelInputRef} type={"file"} onChange={loadExcel}/>
