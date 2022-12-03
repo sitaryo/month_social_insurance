@@ -131,7 +131,7 @@ const App: React.FC = () => {
       </div>
 
       <hr/>
-      <span>2. 请上传要赛选的人员名单:</span>
+      <span>2. 请上传要筛选的人员名单:</span>
       <div style={{display: "flex", justifyContent: "space-between"}}>
         <input ref={personInputRef} type={"file"} onChange={loadPerson}/>
         <button onClick={resetPerson}>清空人员名单</button>
