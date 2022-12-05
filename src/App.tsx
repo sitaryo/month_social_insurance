@@ -1,4 +1,4 @@
-import React, {ChangeEvent, useMemo, useRef, useState} from 'react';
+import React, {ChangeEvent, useEffect, useMemo, useRef, useState} from 'react';
 import {read, utils, writeFile} from "xlsx";
 import moment, {Moment} from "moment";
 
@@ -21,6 +21,9 @@ const App: React.FC = () => {
   const [persons, setPersons] = useState<Person[]>([]);
   const [fileName, setFileName] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [excelError, setExcelError] = useState('');
+  const [personError, setPersonError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const personInputRef = useRef<any>(null);
   const excelInputRef = useRef<any>(null);
@@ -37,12 +40,13 @@ const App: React.FC = () => {
 
   const loadExcel = (event: ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
+    setExcelError("");
     if (files) {
       setFileName("[汇总]" + files[0].name);
       let fr = new FileReader();
       fr.readAsBinaryString(files[0]);
+      setLoading(true);
       fr.onload = (f) => {
-
         const data = new Map<string, Moment[]>();
         const months: Moment[] = [];
 
@@ -54,26 +58,35 @@ const App: React.FC = () => {
           months.push(month);
           ds.splice(0, 1);
           ds.forEach(row => {
-            row.name = row.name.trim();
-            row.id = row.id.trim();
-            const key = Person.toStr(row);
-            if (!data.has(key)) {
-              data.set(key, [month]);
-            } else {
-              data.get(key)?.push(month);
+            try {
+              row.name = row.name.trim();
+              row.id = row.id.trim();
+              const key = Person.toStr(row);
+              if (!data.has(key)) {
+                data.set(key, [month]);
+              } else {
+                data.get(key)?.push(month);
+              }
+            } catch (e) {
+              setLoading(false);
+              setExcelError(`读取参保数据错误：sheet[${sheetName}] 中格式错误,内容【 姓名${row.name} 身份证${row.id}】`);
+              throw e;
             }
-          })
+          });
         })
 
         setMonths(months.sort((a, b) => a.diff(b)));
         setData(data);
+        setLoading(false);
       };
     }
   }
 
   const loadPerson = (event: ChangeEvent<HTMLInputElement>) => {
+    setPersonError("");
     const files = event.target.files;
     if (files) {
+      setLoading(true);
       let fr = new FileReader();
       fr.readAsBinaryString(files[0]);
       fr.onload = (f) => {
@@ -85,10 +98,17 @@ const App: React.FC = () => {
         );
         ds.splice(0, 1);
         ds.forEach(p => {
-          p.name = p.name.trim();
-          p.id = p.id.trim();
+          try {
+            p.name = p.name.trim();
+            p.id = p.id.trim();
+          } catch (e) {
+            setLoading(false);
+            setPersonError(`读取参保数据错误：内容【 姓名${p.name} 身份证${p.id}】`);
+            throw e;
+          }
         });
         setPersons(ds);
+        setLoading(false);
       };
     }
   }
@@ -142,31 +162,32 @@ const App: React.FC = () => {
   const footer = () => {
     const personToCount = Array.from(data.entries())
       .filter(([key]) => persons.length == 0 ? true : persons.some(p => Person.toStr(p) === key))
-      .map(([k, v]) => v)
+      .map(([_, v]) => v)
       .flat();
 
-    return months.map(m => <td>{personToCount.filter(s => s.diff(m) == 0).length * 650}</td>)
+    return months.map((m, i) => <td key={`month_${i}`}>{personToCount.filter(s => s.diff(m) == 0).length * 650}</td>)
   }
 
-  const monthCount = ()=>{
+  const monthCount = () => {
     const personToCount = Array.from(data.entries())
       .filter(([key]) => persons.length == 0 ? true : persons.some(p => Person.toStr(p) === key))
-      .map(([k, v]) => v)
+      .map(([_, v]) => v)
       .flat();
     return personToCount.length;
   }
 
-  const yearCount = ()=>{
+  const yearCount = () => {
     const personToCount = Array.from(data.entries())
       .filter(([key]) => persons.length == 0 ? true : persons.some(p => Person.toStr(p) === key))
-      .map(([k, v]) => v)
+      .map(([_, v]) => v)
       .flat();
-    return years().map(y=><td>{personToCount.filter(v=>v.year() === y).length*650}</td>);
+    return years().map((y, i) => <td
+      key={`year_count_${i}`}>{personToCount.filter(v => v.year() === y).length * 650}</td>);
   }
 
   return (
     <div style={{display: "flex", padding: 8, paddingTop: 32, flexDirection: "column"}}>
-      <h3 style={{textAlign:"center"}}>参保汇总工具 v1.0.2</h3>
+      <h3 style={{textAlign: "center"}}>参保汇总工具 v1.0.3</h3>
       <span>1. 请上传参保表格:</span>
       <div style={{display: "flex", justifyContent: "space-between"}}>
         <input ref={excelInputRef} type={"file"} onChange={loadExcel}/>
@@ -187,6 +208,16 @@ const App: React.FC = () => {
       <hr/>
       <button onClick={exportExcel}>4. 导出结果</button>
 
+      {
+        loading && <div>正在处理数据</div>
+      }
+      {
+        excelError && <h5>{excelError}</h5>
+      }
+      {
+        personError && <h5>{personError}</h5>
+      }
+
       <table border={1} ref={tableRef} style={{display: months.length == 0 ? 'none' : "block"}}>
         <thead>
         <tr>
@@ -205,7 +236,7 @@ const App: React.FC = () => {
             <th>终止参保年月</th>
             {months.map((m, i) => <th key={`month_${i}`}>{yearMonthToString(m)}</th>)}
             <th>购买社保合计月</th>
-            {years().map(y => <th>{y + "年"}</th>)}
+            {years().map(y => <th key={`year_${y}`}>{y + "年"}</th>)}
             <th>合计</th>
           </tr>
         </>, [data, months, persons])}
@@ -226,10 +257,11 @@ const App: React.FC = () => {
                   {months.map((month, j) =>
                     <td key={`money_${i}_${j}`}
                         style={{textAlign: 'right'}}>{value.some(m => m === month) ? '650' : ''}</td>
-                  )}
+                  )}1.
                   <td>{value.length}</td>
                   {
-                    years().map(y => <td>{value.filter(v => v.year() == y).length * 650}</td>)
+                    years().map((y, j) => <td
+                      key={`year_count_${i}_${j}`}>{value.filter(v => v.year() == y).length * 650}</td>)
                   }
                   <td>{value.length * 650}</td>
                 </tr>
@@ -245,7 +277,7 @@ const App: React.FC = () => {
             {footer()}
             <td>{monthCount()}</td>
             {yearCount()}
-            <td>{monthCount()*650}</td>
+            <td>{monthCount() * 650}</td>
           </tr>
           </tfoot>
         </>, [data, months, persons])}
