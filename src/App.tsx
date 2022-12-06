@@ -257,7 +257,7 @@ const App: React.FC = () => {
                   {months.map((month, j) =>
                     <td key={`money_${i}_${j}`}
                         style={{textAlign: 'right'}}>{value.some(m => m === month) ? '650' : ''}</td>
-                  )}1.
+                  )}
                   <td>{value.length}</td>
                   {
                     years().map((y, j) => <td
