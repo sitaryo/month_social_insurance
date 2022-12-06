@@ -2,6 +2,8 @@ import React, {ChangeEvent, useMemo, useRef, useState} from 'react';
 import {read, utils, writeFile} from "xlsx";
 import moment, {Moment} from "moment";
 
+type ExportType = "person" | "excel";
+
 class Person {
   name: string = '';
   id: string = '';
@@ -24,6 +26,7 @@ const App: React.FC = () => {
   const [excelError, setExcelError] = useState('');
   const [personError, setPersonError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [exportType, setExportType] = useState<ExportType>("person");
 
   const personInputRef = useRef<any>(null);
   const excelInputRef = useRef<any>(null);
@@ -31,14 +34,13 @@ const App: React.FC = () => {
 
 
   const readStringAsYearMonth = (s: string) => moment(s, 'YYYYMM');
-  const yearMonthToString = (yearMonth: Moment) => yearMonth.format('YYYYMM');
-
-  const sortYearMonth = (yearMonths: Moment[]) => {
-    const sort = yearMonths.sort((a, b) => a.diff(b));
-    return [sort[0], sort[sort.length - 1]]
-  }
 
   const loadExcel = (event: ChangeEvent<HTMLInputElement>) => {
+    if (persons.length === 0) {
+      alert("请先上传人员名单");
+      resetExcel();
+      return;
+    }
     const files = event.target.files;
     setExcelError("");
     if (files) {
@@ -48,6 +50,7 @@ const App: React.FC = () => {
       setLoading(true);
       fr.onload = (f) => {
         const data = new Map<string, Moment[]>();
+        persons.forEach(p => data.set(Person.toStr(p), []));
         const months: Moment[] = [];
 
         const res = f.target?.result as string;
@@ -62,9 +65,8 @@ const App: React.FC = () => {
               row.name = `${row?.name ?? ""}`.trim();
               row.id = `${row?.id ?? ""}`.trim();
               const key = Person.toStr(row);
-              if (!data.has(key)) {
-                data.set(key, [month]);
-              } else {
+
+              if (data.has(key)) {
                 data.get(key)?.push(month);
               }
             } catch (e) {
@@ -126,10 +128,6 @@ const App: React.FC = () => {
   }
 
   const exportExcel = () => {
-    if (tableRef.current === null) {
-      alert("请先上传参保表格");
-      return;
-    }
     const wb = utils.book_new();
     const ws = utils.table_to_sheet(tableRef.current, {raw: true});
 
@@ -140,6 +138,68 @@ const App: React.FC = () => {
   const changeCompanyName = (event: ChangeEvent<HTMLInputElement>) => {
     setCompanyName(event.target.value ?? "");
   }
+
+  const changeExportType = (e: ChangeEvent<HTMLSelectElement>) => {
+    setLoading(true);
+    setTimeout(() => {
+      setExportType(e.target.value as ExportType);
+      setLoading(false);
+    }, 500);
+  }
+
+  return (
+    <div style={{display: "flex", padding: 8, paddingTop: 32, flexDirection: "column"}}>
+      <h3 style={{textAlign: "center"}}>参保汇总工具 v1.0.5</h3>
+
+      <span>1. 请上传要筛选的人员名单:</span>
+      <div style={{display: "flex", justifyContent: "space-between"}}>
+        <input ref={personInputRef} type={"file"} onChange={loadPerson}/>
+        <button onClick={resetPerson}>清空人员名单</button>
+      </div>
+
+      <hr/>
+      <span>2. 请上传参保表格:</span>
+      <div style={{display: "flex", justifyContent: "space-between"}}>
+        <input ref={excelInputRef} type={"file"} onChange={loadExcel}/>
+        <button onClick={resetExcel}>清空参保表格</button>
+      </div>
+
+      <hr/>
+      <span>3. 公司名称:</span>
+      <input type={"text"} value={companyName} onChange={changeCompanyName}/>
+
+      <hr/>
+      <span>4. 导出方式:</span>
+      <select value={exportType} onChange={changeExportType}>
+        <option value={"person"}>以人员表为准，人员表有几个人汇总表就有几项</option>
+        <option value={"excel"}>以参保表为准</option>
+      </select>
+
+      <hr/>
+      <button onClick={exportExcel}>5. 导出结果</button>
+      {excelError && <h5>{excelError}</h5>}
+      {personError && <h5>{personError}</h5>}
+      {
+        loading ?
+          <h3 style={{textAlign: "center", color: 'red'}}>正在处理数据</h3> :
+          <Table months={months} data={data} persons={persons} companyName={companyName} table={tableRef}
+                 exportType={exportType}/>
+      }
+    </div>
+  );
+}
+
+interface P {
+  months: Moment[],
+  data: Map<string, Moment[]>,
+  persons: Person[],
+  companyName: string,
+  table: any,
+  exportType: ExportType,
+}
+
+const Table: React.FC<P> = (props) => {
+  const {months, data, persons, companyName, table, exportType} = props;
 
   const years = () => Array.from(new Set(months.map(m => m.year()))).sort((a, b) => a - b);
 
@@ -185,105 +245,80 @@ const App: React.FC = () => {
       key={`year_count_${i}`}>{personToCount.filter(v => v.year() === y).length * 650}</td>);
   }
 
-  return (
-    <div style={{display: "flex", padding: 8, paddingTop: 32, flexDirection: "column"}}>
-      <h3 style={{textAlign: "center"}}>参保汇总工具 v1.0.4</h3>
-      <span>1. 请上传参保表格:</span>
-      <div style={{display: "flex", justifyContent: "space-between"}}>
-        <input ref={excelInputRef} type={"file"} onChange={loadExcel}/>
-        <button onClick={resetExcel}>清空参保表格</button>
-      </div>
+  const yearMonthToString = (yearMonth: Moment | undefined) => yearMonth?.format('YYYYMM') ?? "";
 
-      <hr/>
-      <span>2. 请上传要筛选的人员名单:</span>
-      <div style={{display: "flex", justifyContent: "space-between"}}>
-        <input ref={personInputRef} type={"file"} onChange={loadPerson}/>
-        <button onClick={resetPerson}>清空人员名单</button>
-      </div>
+  const sortYearMonth = (yearMonths: Moment[]) => {
+    const sort = yearMonths.sort((a, b) => a.diff(b));
+    return [sort[0], sort[sort.length - 1]]
+  }
 
-      <hr/>
-      <span>3. 公司名称:</span>
-      <input type={"text"} value={companyName} onChange={changeCompanyName}/>
-
-      <hr/>
-      <button onClick={exportExcel}>4. 导出结果</button>
-
+  const renderRow = (person: Person, value: Moment[], i: number) => {
+    const [start, end] = sortYearMonth(value);
+    return <tr key={`row_${i}`}>
+      <td>{person.name}</td>
+      <td>{person.id}</td>
+      <td>{yearMonthToString(start)}</td>
+      <td>{yearMonthToString(end)}</td>
+      {months.map((month, j) =>
+        <td key={`money_${i}_${j}`}
+            style={{textAlign: 'right'}}>{value.some(m => m === month) ? '650' : ''}</td>
+      )}
+      <td>{value.length}</td>
       {
-        loading && <div>正在处理数据</div>
+        years().map((y, j) => <td
+          key={`year_count_${i}_${j}`}>{value.filter(v => v.year() == y).length * 650}</td>)
       }
-      {
-        excelError && <h5>{excelError}</h5>
-      }
-      {
-        personError && <h5>{personError}</h5>
-      }
+      <td>{value.length * 650}</td>
+    </tr>
+  }
 
-      <table border={1} ref={tableRef} style={{display: months.length == 0 ? 'none' : "block"}}>
-        <thead>
-        <tr>
-          {useMemo(() => <th>{companyName}</th>, [companyName])}
-          <th/>
-          <th/>
-          <th/>
-          {useMemo(() => renderYearColumn(), [data, months, persons])}
-          <th colSpan={2 + years().length}>数据统计</th>
-        </tr>
-        {useMemo(() => <>
-          <tr>
-            <th style={{width: 200}}>姓名</th>
-            <th>身份证</th>
-            <th>开始参保年月</th>
-            <th>终止参保年月</th>
-            {months.map((m, i) => <th key={`month_${i}`}>{yearMonthToString(m)}</th>)}
-            <th>购买社保合计月</th>
-            {years().map(y => <th key={`year_${y}`}>{y + "年"}</th>)}
-            <th>合计</th>
-          </tr>
-        </>, [data, months, persons])}
-        </thead>
-        {useMemo(() => <>
-          <tbody>
-          {
-            Array.from(data.entries())
-              .filter(([key]) => persons.length == 0 ? true : persons.some(p => Person.toStr(p) === key))
-              .map(([key, value], i) => {
-                const [start, end] = sortYearMonth(value);
-                const person = Person.fromString(key);
-                return <tr key={`row_${i}`}>
-                  <td>{person.name}</td>
-                  <td>{person.id}</td>
-                  <td>{yearMonthToString(start)}</td>
-                  <td>{yearMonthToString(end)}</td>
-                  {months.map((month, j) =>
-                    <td key={`money_${i}_${j}`}
-                        style={{textAlign: 'right'}}>{value.some(m => m === month) ? '650' : ''}</td>
-                  )}
-                  <td>{value.length}</td>
-                  {
-                    years().map((y, j) => <td
-                      key={`year_count_${i}_${j}`}>{value.filter(v => v.year() == y).length * 650}</td>)
-                  }
-                  <td>{value.length * 650}</td>
-                </tr>
-              })
-          }
-          </tbody>
-          <tfoot>
-          <tr>
-            <td/>
-            <td/>
-            <td/>
-            <td>合计</td>
-            {footer()}
-            <td>{monthCount()}</td>
-            {yearCount()}
-            <td>{monthCount() * 650}</td>
-          </tr>
-          </tfoot>
-        </>, [data, months, persons])}
-      </table>
-    </div>
-  );
+  return <table border={1} ref={table}>
+    <thead>
+    <tr>
+      <th>{companyName}</th>
+      <th/>
+      <th/>
+      <th/>
+      {useMemo(() => renderYearColumn(), [data, months, persons])}
+      <th colSpan={2 + years().length}>数据统计</th>
+    </tr>
+    {useMemo(() =>
+      <tr>
+        <th style={{width: 200}}>姓名</th>
+        <th>身份证</th>
+        <th>开始参保年月</th>
+        <th>终止参保年月</th>
+        {months.map((m, i) => <th key={`month_${i}`}>{yearMonthToString(m)}</th>)}
+        <th>购买社保合计月</th>
+        {years().map(y => <th key={`year_${y}`}>{y + "年"}</th>)}
+        <th>合计</th>
+      </tr>, [data, months, persons])}
+    </thead>
+    {useMemo(() => <>
+      <tbody>
+      {
+        exportType === "person" ?
+          persons.map((person, i) => renderRow(person, data.get(Person.toStr(person)) ?? [], i)) :
+          Array.from(data.entries())
+            .filter(([key, value]) => persons.some(p => Person.toStr(p) === key) && value.length !== 0)
+            .map(([key, value], i) => renderRow(Person.fromString(key), value, i))
+      }
+      </tbody>
+      <tfoot>
+      <tr>
+        <td/>
+        <td/>
+        <td/>
+        <td>合计</td>
+        {footer()}
+        <td>{monthCount()}</td>
+        {yearCount()}
+        <td>{monthCount() * 650}</td>
+      </tr>
+      </tfoot>
+    </>, [data, months, persons, exportType])}
+  </table>;
 }
+
 
 export default App;
