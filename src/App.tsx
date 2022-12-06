@@ -1,4 +1,4 @@
-import React, {ChangeEvent, useEffect, useMemo, useRef, useState} from 'react';
+import React, {ChangeEvent, useMemo, useRef, useState} from 'react';
 import {read, utils, writeFile} from "xlsx";
 import moment, {Moment} from "moment";
 
@@ -59,8 +59,8 @@ const App: React.FC = () => {
           ds.splice(0, 1);
           ds.forEach(row => {
             try {
-              row.name = row.name.trim();
-              row.id = row.id.trim();
+              row.name = `${row?.name ?? ""}`.trim();
+              row.id = `${row?.id ?? ""}`.trim();
               const key = Person.toStr(row);
               if (!data.has(key)) {
                 data.set(key, [month]);
@@ -99,8 +99,8 @@ const App: React.FC = () => {
         ds.splice(0, 1);
         ds.forEach(p => {
           try {
-            p.name = p.name.trim();
-            p.id = p.id.trim();
+            p.name = `${p?.name ?? ""}`.trim();
+            p.id = `${p?.id ?? ""}`.trim();
           } catch (e) {
             setLoading(false);
             setPersonError(`读取参保数据错误：内容【 姓名${p.name} 身份证${p.id}】`);
