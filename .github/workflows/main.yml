@@ -1,0 +1,16 @@
+name: flutter build on windows arm
+on:
+  push:
+    tags: 
+      - v*
+jobs:
+ build:
+   runs-on: windows-latest
+   steps:
+     - uses: actions/checkout@v3
+     - uses: subosito/flutter-action@v2
+       with:
+         channel: 'stable'
+         architecture: arm64
+     - run: flutter config --enable-windows-desktop
+     - run: flutter build windows
