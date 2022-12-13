@@ -66,7 +66,8 @@ const App: React.FC = () => {
               row.id = `${row?.id ?? ""}`.trim();
               const key = Person.toStr(row);
 
-              if (data.has(key)) {
+              // 同一个人可能在同一个sheet内存在多条数据，every 去重
+              if (data.has(key) && data.get(key)?.every(m => m.diff(month) != 0)) {
                 data.get(key)?.push(month);
               }
             } catch (e) {
@@ -141,15 +142,15 @@ const App: React.FC = () => {
 
   const changeExportType = (e: ChangeEvent<HTMLSelectElement>) => {
     setLoading(true);
+    setExportType(e.target.value as ExportType);
     setTimeout(() => {
-      setExportType(e.target.value as ExportType);
       setLoading(false);
     }, 500);
   }
 
   return (
     <div style={{display: "flex", padding: 8, paddingTop: 32, flexDirection: "column"}}>
-      <h3 style={{textAlign: "center"}}>参保汇总工具 v1.0.5</h3>
+      <h3 style={{textAlign: "center"}}>参保汇总工具 v1.0.6</h3>
 
       <span>1. 请上传要筛选的人员名单:</span>
       <div style={{display: "flex", justifyContent: "space-between"}}>
