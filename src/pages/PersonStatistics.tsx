@@ -4,7 +4,7 @@ import ExportUtil from "../util/ExportUtil";
 
 type ExportType = "person" | "excel";
 
-class Person {
+export class Person {
   name: string = '';
   id: string = '';
 
@@ -59,7 +59,7 @@ const PersonStatistics: React.FC<P> = (props) => {
           ds.splice(0, 1);
           ds.forEach(row => {
             try {
-              row.name = `${row?.name ?? ""}`.trim();
+              row.name = `${row?.name ?? ""}`.trim().replaceAll(" ", "");
               row.id = `${row?.id ?? ""}`.trim();
               const key = Person.toStr(row);
 
@@ -98,7 +98,7 @@ const PersonStatistics: React.FC<P> = (props) => {
         ds.splice(0, 1);
         ds.forEach(p => {
           try {
-            p.name = `${p?.name ?? ""}`.trim();
+            p.name = `${p?.name ?? ""}`.trim().replaceAll(" ", "");
             p.id = `${p?.id ?? ""}`.trim();
           } catch (e) {
             setLoading(false);

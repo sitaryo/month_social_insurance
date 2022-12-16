@@ -2,6 +2,7 @@ import React, {ChangeEvent, useRef, useState} from 'react';
 import {read, utils} from "xlsx";
 import ExportUtil from "../util/ExportUtil";
 import moment from "moment";
+import {Person} from "./PersonStatistics";
 
 class Record {
   company: string = '';
@@ -19,10 +20,12 @@ const personStringToPerson = (str: string) => str.split("_");
 const CompanyStatistics: React.FC<P> = (props) => {
   const [records, setRecords] = useState<Record[]>([]);
   const [company, setCompany] = useState<Set<string>>(new Set());
+  const [persons, setPersons] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
   const excelRef = useRef<any>();
+  const personsRef = useRef<any>();
   const companyRef = useRef<any>();
 
   const resetExcel = () => {
@@ -38,6 +41,14 @@ const CompanyStatistics: React.FC<P> = (props) => {
 
 
   const uploadExcel = (event: ChangeEvent<HTMLInputElement>) => {
+    if (!persons.size) {
+      alert("请先上传人员表");
+      return;
+    }
+    if (!company.size) {
+      alert("请先上传公司表");
+      return;
+    }
     const files = event.target.files;
     if (files) {
       let total = files.length;
@@ -56,19 +67,20 @@ const CompanyStatistics: React.FC<P> = (props) => {
           workBook.SheetNames.forEach((sheetName, i) => {
             const ds = utils.sheet_to_json<Record>(
               workBook.Sheets[sheetName],
-              {header: ['company', 'month', 'name', 'id']}
+              {header: ['company', 'month', 'name', 'id'], blankrows: false}
             );
             ds.splice(0, 1);
-            ds.forEach((p, i) => {
+            const result = ds.map((p, i) => {
               p.company = `${p?.company ?? ""}`.trim();
               p.month = `${p?.month ?? ""}`.trim();
               if (!moment(p.month, 'YYYYMM', true).isValid()) {
                 errMsg.push(filename + " 文件 : sheet :" + sheetName + " " + (i + 2) + " 行时间格式错误： " + p.month);
               }
-              p.name = `${p?.name ?? ""}`.trim();
+              p.name = `${p?.name ?? ""}`.trim().replaceAll(" ", "");
               p.id = `${p?.id ?? ""}`.trim();
-            });
-            totalRecord = [...totalRecord, ...ds];
+              return p;
+            }).filter(r => persons.has(recordToPersonString(r)) && company.has(r.company));
+            totalRecord = [...totalRecord, ...result];
           });
 
           process++;
@@ -76,7 +88,6 @@ const CompanyStatistics: React.FC<P> = (props) => {
             setLoading(false);
             setRecords(totalRecord);
             setErrors(errMsg);
-            console.debug(totalRecord);
           }
         };
       }
@@ -100,8 +111,6 @@ const CompanyStatistics: React.FC<P> = (props) => {
         const result = ds.map(c => `${c.name ?? ""}`.trim());
         setCompany(new Set(result));
         setLoading(false);
-        console.debug(result);
-        console.debug(ds);
       };
     }
   }
@@ -151,17 +160,55 @@ const CompanyStatistics: React.FC<P> = (props) => {
     setLoading(false);
   }
 
+  const loadPerson = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      setLoading(true);
+      let fr = new FileReader();
+      fr.readAsBinaryString(files[0]);
+      fr.onload = (f) => {
+        const res = f.target?.result as string;
+        const workBook = read(res, {type: "binary"});
+        const ds = utils.sheet_to_json<Person>(
+          workBook.Sheets[workBook.SheetNames[0]],
+          {header: ['name', 'id']}
+        );
+        ds.splice(0, 1);
+        const result = ds.map(p => {
+          p.name = `${p?.name ?? ""}`.trim().replaceAll(" ", "");
+          p.id = `${p?.id ?? ""}`.trim();
+          return Person.toStr(p);
+        });
+        setPersons(new Set(result));
+        setLoading(false);
+      };
+    }
+  }
+
+  const resetPerson = () => {
+    setPersons(new Set());
+    setErrors([]);
+    personsRef.current.value = null;
+  }
+
   return <React.Fragment>
-    <span>1. 请上传参保表:</span>
-    <div style={{display: "flex", justifyContent: "space-between"}}>
-      <input ref={excelRef} type={"file"} onChange={uploadExcel} multiple/>
-      <button onClick={resetExcel}>清空参保表</button>
-    </div>
-    <hr/>
-    <span>2. 请上传公司表:</span>
+
+    <span>1. 请上传公司表: {company.size !== 0 && "已导入" + company.size + "条公司数据"}</span>
     <div style={{display: "flex", justifyContent: "space-between"}}>
       <input ref={companyRef} type={"file"} onChange={uploadCompany}/>
       <button onClick={resetCompany}>清空公司表</button>
+    </div>
+
+    <span>2. 请上传人员表: {persons.size !== 0 && "已导入" + persons.size + "条人员数据"}</span>
+    <div style={{display: "flex", justifyContent: "space-between"}}>
+      <input ref={personsRef} type={"file"} onChange={loadPerson}/>
+      <button onClick={resetPerson}>清空人员表</button>
+    </div>
+
+    <span>3. 请上传参保表: {records.length !== 0 && "筛选出" + records.length + "条数据"}</span>
+    <div style={{display: "flex", justifyContent: "space-between"}}>
+      <input ref={excelRef} type={"file"} onChange={uploadExcel} multiple/>
+      <button onClick={resetExcel}>清空参保表</button>
     </div>
 
     <hr/>
@@ -174,8 +221,8 @@ const CompanyStatistics: React.FC<P> = (props) => {
     }
     {
       errors
-      .slice(0, 1000)
-      .map((e, i) => <div key={`error_${i}`} style={{textAlign: "center", color: 'red'}}>{e}</div>)
+        .slice(0, 1000)
+        .map((e, i) => <div key={`error_${i}`} style={{textAlign: "center", color: 'red'}}>{e}</div>)
     }
   </React.Fragment>;
 }

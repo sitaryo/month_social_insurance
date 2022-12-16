@@ -1,5 +1,6 @@
 import {utils, writeFile} from "xlsx";
 import moment, {Moment} from "moment";
+import {writeFileSync} from "fs";
 
 export class CompanyStatisticsRecord {
   name: string = '';
@@ -56,7 +57,7 @@ class ExportUtil {
 
     const monthsRange = ExportUtil.getMonthRange(start, end)
     const totalRecord: any[] = [
-      ['序号', '姓名', '身份证号', '证件编号', '证件类型', '开始参保年月', '结束参保年月', '参保总月数','合计', ...monthsRange.map(m => m.format("yyyyMM"))],
+      ['序号', '姓名', '身份证号', '证件编号', '证件类型', '开始参保年月', '结束参保年月', '参保总月数', '合计', ...monthsRange.map(m => m.format("yyyyMM"))],
     ];
 
     Array.from(persons.entries())
@@ -115,6 +116,7 @@ class ExportUtil {
   }
 
   static exportCompanyStatistics = (data: Map<string, Map<string, Set<string>>>) => {
+    const wbs = new Map();
     Array.from(data.entries()).forEach(([company, persons]) => {
       const wb = utils.book_new();
       const totalRecord = [
@@ -197,8 +199,11 @@ class ExportUtil {
       const ws4 = utils.aoa_to_sheet(ExportUtil.collectToPersonStatistics(persons));
       utils.book_append_sheet(wb, ws4, "个人统计");
 
-      writeFile(wb, `${company}[汇总].xlsx`);
+      wbs.set(`${company}[汇总].xlsx`, wb);
     })
+    Array.from(wbs.entries())
+      .map(([name, wb]) => writeFile(wb, name))
+
   }
 
   static exportPersonStatistics = (company: string, data: Map<string, Set<string>>) => {
@@ -207,7 +212,7 @@ class ExportUtil {
 
     utils.book_append_sheet(wb, ws, "个人统计");
 
-    writeFile(wb, `${company}[汇总].xlsx`);
+    writeFile(wb, `${company}[汇总].xlsx`, {});
   }
 }
 
