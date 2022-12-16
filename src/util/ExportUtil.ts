@@ -1,6 +1,6 @@
-import {utils, writeFile} from "xlsx";
+import {utils, write, writeFile} from "xlsx";
 import moment, {Moment} from "moment";
-import {writeFileSync} from "fs";
+import JSZip from "jszip";
 
 export class CompanyStatisticsRecord {
   name: string = '';
@@ -201,9 +201,22 @@ class ExportUtil {
 
       wbs.set(`${company}[汇总].xlsx`, wb);
     })
+    const zip = new JSZip();
     Array.from(wbs.entries())
-      .map(([name, wb]) => writeFile(wb, name))
-
+      .forEach(([name, wb]) => zip.file(name, write(wb, {type: "buffer"})));
+    const download = (file: BlobPart, name?: string) => {
+      const url = URL.createObjectURL(new Blob([file]));
+      const dl = document.createElement('a');
+      dl.download = name || ('fflate-demo-' + Date.now() + '.dat');
+      dl.href = url;
+      dl.click();
+      URL.revokeObjectURL(url);
+    }
+    console.log(wbs.size);
+    zip.generateAsync({type: "blob"})
+      .then(file => {
+        download(file, "汇总.zip");
+      });
   }
 
   static exportPersonStatistics = (company: string, data: Map<string, Set<string>>) => {
