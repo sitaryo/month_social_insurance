@@ -56,7 +56,7 @@ class ExportUtil {
 
     const monthsRange = ExportUtil.getMonthRange(start, end)
     const totalRecord: any[] = [
-      ['序号', '姓名', '身份证号', '证件编号', '证件类型', '开始参保年月', '结束参保年月', '参保总月数', ...monthsRange.map(m => m.format("yyyyMM"))],
+      ['序号', '姓名', '身份证号', '证件编号', '证件类型', '开始参保年月', '结束参保年月', '参保总月数','合计', ...monthsRange.map(m => m.format("yyyyMM"))],
     ];
 
     Array.from(persons.entries())
@@ -76,7 +76,11 @@ class ExportUtil {
             e?.format('YYYY年MM月') || '',
             {
               t: 'n',
-              f: `counta(${ExportUtil.numberToLetters(8) + (i + 2)}:${ExportUtil.numberToLetters(8 + monthsRange.length - 1) + (i + 2)})`
+              f: `counta(${ExportUtil.numberToLetters(9) + (i + 2)}:${ExportUtil.numberToLetters(9 + monthsRange.length - 1) + (i + 2)})`
+            },
+            {
+              t: 'n',
+              f: `sum(${ExportUtil.numberToLetters(9) + (i + 2)}:${ExportUtil.numberToLetters(9 + monthsRange.length - 1) + (i + 2)})`
             },
             ...monthsRange.map(m => ms.some(e => e.isSame(m)) ? 650 : null),
           ]);
@@ -95,10 +99,14 @@ class ExportUtil {
         t: 'n',
         f: `sum(${ExportUtil.numberToLetters(7) + 2}:${ExportUtil.numberToLetters(7) + totalRecord.length})`
       },
+      {
+        t: 'n',
+        f: `sum(${ExportUtil.numberToLetters(8) + 2}:${ExportUtil.numberToLetters(8) + totalRecord.length})`
+      },
       ...monthsRange.map((_, i) =>
         ({
           t: 'n',
-          f: `sum(${ExportUtil.numberToLetters(8 + i) + 2}:${ExportUtil.numberToLetters(8 + i) + totalRecord.length})`
+          f: `sum(${ExportUtil.numberToLetters(9 + i) + 2}:${ExportUtil.numberToLetters(9 + i) + totalRecord.length})`
         })
       ),
     ]);
