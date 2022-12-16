@@ -47,6 +47,7 @@ const CompanyStatistics: React.FC<P> = (props) => {
     }
     if (!persons.size && !window.confirm("未上传人员表，是否继续？")) {
       console.log('return')
+      resetExcel();
       return;
     }
     console.log('true')
