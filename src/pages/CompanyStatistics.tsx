@@ -41,14 +41,15 @@ const CompanyStatistics: React.FC<P> = (props) => {
 
 
   const uploadExcel = (event: ChangeEvent<HTMLInputElement>) => {
-    if (!persons.size) {
-      alert("请先上传人员表");
-      return;
-    }
     if (!company.size) {
       alert("请先上传公司表");
       return;
     }
+    if (!persons.size && !window.confirm("未上传人员表，是否继续？")) {
+      console.log('return')
+      return;
+    }
+    console.log('true')
     const files = event.target.files;
     if (files) {
       let total = files.length;
@@ -79,7 +80,7 @@ const CompanyStatistics: React.FC<P> = (props) => {
               p.name = `${p?.name ?? ""}`.trim().replaceAll(" ", "");
               p.id = `${p?.id ?? ""}`.trim();
               return p;
-            }).filter(r => persons.has(recordToPersonString(r)) && company.has(r.company));
+            }).filter(r => (persons.size == 0 || persons.has(recordToPersonString(r))) && company.has(r.company));
             totalRecord = [...totalRecord, ...result];
           });
 
@@ -161,6 +162,7 @@ const CompanyStatistics: React.FC<P> = (props) => {
   }
 
   const loadPerson = (event: ChangeEvent<HTMLInputElement>) => {
+    resetExcel();
     const files = event.target.files;
     if (files) {
       setLoading(true);
