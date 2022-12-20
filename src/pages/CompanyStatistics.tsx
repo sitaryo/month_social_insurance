@@ -2,7 +2,8 @@ import React, {ChangeEvent, useRef, useState} from 'react';
 import {read, utils} from "xlsx";
 import ExportUtil from "../util/ExportUtil";
 import moment from "moment";
-import {Person} from "./PersonStatistics";
+import StringUtil from "../util/StringUtil";
+import {Person, PersonToStr} from "../model/Person";
 
 class Record {
   company: string = '';
@@ -13,9 +14,6 @@ class Record {
 
 interface P {
 }
-
-const recordToPersonString = (record: Record) => `${record.name}_${record.id}`;
-const personStringToPerson = (str: string) => str.split("_");
 
 const CompanyStatistics: React.FC<P> = (props) => {
   const [records, setRecords] = useState<Record[]>([]);
@@ -64,22 +62,22 @@ const CompanyStatistics: React.FC<P> = (props) => {
         fr.onload = (f) => {
           const res = f.target?.result as string;
           const workBook = read(res, {type: "binary"});
-          workBook.SheetNames.forEach((sheetName, i) => {
+          workBook.SheetNames.forEach((sheetName) => {
             const ds = utils.sheet_to_json<Record>(
               workBook.Sheets[sheetName],
               {header: ['company', 'month', 'name', 'id'], blankrows: false}
             );
             ds.splice(0, 1);
             const result = ds.map((p, i) => {
-              p.company = `${p?.company ?? ""}`.trim();
-              p.month = `${p?.month ?? ""}`.trim();
+              p.company = StringUtil.trim(p?.company);
+              p.month = StringUtil.trim(p?.month);
               if (!moment(p.month, 'YYYYMM', true).isValid()) {
                 errMsg.push(filename + " 文件 : sheet :" + sheetName + " " + (i + 2) + " 行时间格式错误： " + p.month);
               }
-              p.name = `${p?.name ?? ""}`.trim().replaceAll(" ", "");
-              p.id = `${p?.id ?? ""}`.trim();
+              p.name = StringUtil.replaceBlank(p?.name);
+              p.id = StringUtil.trim(p?.id);
               return p;
-            }).filter(r => (persons.size == 0 || persons.has(recordToPersonString(r))) && company.has(r.company));
+            }).filter(r => (persons.size == 0 || persons.has(PersonToStr(r))) && company.has(r.company));
             totalRecord = [...totalRecord, ...result];
           });
 
@@ -108,7 +106,7 @@ const CompanyStatistics: React.FC<P> = (props) => {
           {header: ['name']}
         );
         ds.splice(0, 1);
-        const result = ds.map(c => `${c.name ?? ""}`.trim());
+        const result = ds.map(c => StringUtil.trim(c?.name));
         setCompany(new Set(result));
         setLoading(false);
       };
@@ -122,7 +120,7 @@ const CompanyStatistics: React.FC<P> = (props) => {
       if (!company.has(r.company)) {
         return;
       }
-      const personStr = recordToPersonString(r);
+      const personStr = PersonToStr(r);
       if (companyMap.has(r.company)) {
         const persons = companyMap.get(r.company)!;
         if (persons.has(personStr)) {
@@ -176,9 +174,9 @@ const CompanyStatistics: React.FC<P> = (props) => {
         );
         ds.splice(0, 1);
         const result = ds.map(p => {
-          p.name = `${p?.name ?? ""}`.trim().replaceAll(" ", "");
-          p.id = `${p?.id ?? ""}`.trim();
-          return Person.toStr(p);
+          p.name = StringUtil.replaceBlank(p?.name);
+          p.id = StringUtil.trim(p?.id);
+          return PersonToStr(p);
         });
         setPersons(new Set(result));
         setLoading(false);

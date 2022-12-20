@@ -1,20 +1,10 @@
 import React, {ChangeEvent, useRef, useState} from 'react';
 import {read, utils} from "xlsx";
 import ExportUtil from "../util/ExportUtil";
+import StringUtil from "../util/StringUtil";
+import {Person, PersonToStr} from "../model/Person";
 
 type ExportType = "person" | "excel";
-
-export class Person {
-  name: string = '';
-  id: string = '';
-
-  static fromString = (s: string): Person => {
-    const [name, id] = s.split("_");
-    return {name, id} as Person;
-  }
-
-  static toStr = (p: Person) => `${p.name}_${p.id}`;
-}
 
 
 interface P {
@@ -24,7 +14,6 @@ interface P {
 const PersonStatistics: React.FC<P> = (props) => {
   const [records, setRecords] = useState<Map<string, Set<string>>>(new Map());
   const [persons, setPersons] = useState<Person[]>([]);
-  const [fileName, setFileName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [excelError, setExcelError] = useState('');
   const [personError, setPersonError] = useState('');
@@ -43,13 +32,12 @@ const PersonStatistics: React.FC<P> = (props) => {
     const files = event.target.files;
     setExcelError("");
     if (files) {
-      setFileName("[汇总]" + files[0].name);
       let fr = new FileReader();
       fr.readAsBinaryString(files[0]);
       setLoading(true);
       fr.onload = (f) => {
         const data = new Map<string, Set<string>>();
-        persons.forEach(p => data.set(Person.toStr(p), new Set()));
+        persons.forEach(p => data.set(PersonToStr(p), new Set()));
 
         const res = f.target?.result as string;
         const workBook = read(res, {type: "binary"});
@@ -59,9 +47,9 @@ const PersonStatistics: React.FC<P> = (props) => {
           ds.splice(0, 1);
           ds.forEach(row => {
             try {
-              row.name = `${row?.name ?? ""}`.trim().replaceAll(" ", "");
-              row.id = `${row?.id ?? ""}`.trim();
-              const key = Person.toStr(row);
+              row.name = StringUtil.replaceBlank(row?.name);
+              row.id = StringUtil.trim(row?.id);
+              const key = PersonToStr(row);
 
               // 同一个人可能在同一个sheet内存在多条数据，every 去重
               if (data.has(key)) {
@@ -98,8 +86,8 @@ const PersonStatistics: React.FC<P> = (props) => {
         ds.splice(0, 1);
         ds.forEach(p => {
           try {
-            p.name = `${p?.name ?? ""}`.trim().replaceAll(" ", "");
-            p.id = `${p?.id ?? ""}`.trim();
+            p.name = StringUtil.replaceBlank(p?.name);
+            p.id = StringUtil.trim(p?.id);
           } catch (e) {
             setLoading(false);
             setPersonError(`读取参保数据错误：内容【 姓名${p.name} 身份证${p.id}】`);
@@ -119,7 +107,6 @@ const PersonStatistics: React.FC<P> = (props) => {
 
   const resetExcel = () => {
     setRecords(new Map());
-    setFileName("");
     excelInputRef.current.value = null;
   }
 
@@ -131,7 +118,7 @@ const PersonStatistics: React.FC<P> = (props) => {
 
   const collectRecord = (records: Map<string, Set<string>>, persons: Person[]): Map<string, Set<string>> => {
     const result: Map<string, Set<string>> = new Map();
-    const personsToFilter = new Set(persons.map(p => Person.toStr(p)));
+    const personsToFilter = new Set(persons.map(p => PersonToStr(p)));
     if (exportType === "person") {
       Array.from(personsToFilter).forEach(p => {
         result.set(p, records.get(p) || new Set());

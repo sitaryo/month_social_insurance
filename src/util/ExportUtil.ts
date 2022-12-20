@@ -1,6 +1,7 @@
 import {utils, write, writeFile} from "xlsx";
 import moment, {Moment} from "moment";
 import JSZip from "jszip";
+import {strToPerson} from "../model/Person";
 
 export class CompanyStatisticsRecord {
   name: string = '';
@@ -25,7 +26,7 @@ class ExportUtil {
   private static collectToCompanyStatistics = (persons: Map<string, Set<string>>) => {
     const result: CompanyStatisticsRecord[] = [];
     for (let [nameAndId, months] of persons.entries()) {
-      const [name, id] = nameAndId.split("_");
+      const [name, id] = strToPerson(nameAndId);
       result.push({
         cardNum: "", cardType: "", idType: "",
         name,
@@ -66,7 +67,7 @@ class ExportUtil {
           const monthSorted = ms.sort((a, b) => a.diff(b));
           const s = monthSorted.length ? monthSorted[0] : null;
           const e = monthSorted.length ? monthSorted[monthSorted.length - 1] : null;
-          const [name, id] = p.split("_");
+          const [name, id] = strToPerson(p);
           totalRecord.push([
             i + 1,
             name,
